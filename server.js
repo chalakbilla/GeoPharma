@@ -9,46 +9,35 @@ import { promises as fsPromises } from 'fs';
 import { mkdir } from 'fs/promises';
 import dotenv from 'dotenv';
 
-// Load environment variables
+// Load environment variables from .env
 dotenv.config();
 
 // Initialize express app
 const app = express();
 const port = process.env.PORT || 5000;
 
-// OCR.Space API credentials
+// Load API keys
 const OCR_SPACE_API_KEY = process.env.OCR_SPACE_API_KEY || 'K89505440888957';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OCR_SPACE_API_ENDPOINT = 'https://api.ocr.space/parse/image';
-
-// OpenRouter API configuration
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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';
 const OPENROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Ensure uploads directory exists
+// Ensure upload directory exists
 const uploadsDir = 'uploads';
-mkdir(uploadsDir, { recursive: true }).catch(err => {
-  console.error('Error creating uploads directory:', err.message);
-});
+mkdir(uploadsDir, { recursive: true }).catch(console.error);
 
-// Set up CORS to allow all origins
+// Middleware
 app.use(cors({ origin: '*' }));
-
-// Set up multer for file upload
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({ storage: storage });
-
-// Middleware to parse JSON
 app.use(express.json());
 
-// Basic medical keyword check for text
+// Multer setup
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+const upload = multer({ storage });
+
+// Keywords to detect medical content
 const medicalKeywords = [
   'patient', 'diagnosis', 'prescription', 'medicine', 'medication',
   'doctor', 'hospital', 'clinic', 'symptom', 'disease', 'treatment',
@@ -56,19 +45,25 @@ const medicalKeywords = [
   'breast', 'lung', 'lymphnode', 'metastasis', 'vertebra', 'chest',
 ];
 
-// Route to handle file upload or text input and process medical report
+// Helper to clean malformed JSON
+function cleanOpenRouterResponse(rawContent) {
+  return rawContent
+    .replace(/```(?:json)?/g, '')        // remove markdown code fences
+    .replace(/[\x00-\x1F\x7F]/g, '')     // remove control characters
+    .replace(/,(\s*[\]}])/g, '$1')       // remove trailing commas
+    .trim();
+}
+
+// OCR + AI Analysis route
 app.post('/ocr', upload.single('file'), async (req, res) => {
   let extractedText = '';
   let filePath = req.file?.path;
 
   try {
-    // Handle text input if provided
     if (req.body.text) {
       extractedText = req.body.text.trim();
       console.log('Received Text:', extractedText);
-    }
-    // Handle file upload
-    else if (req.file) {
+    } else if (req.file) {
       const ocrFormData = new FormData();
       ocrFormData.append('file', fs.createReadStream(req.file.path));
       ocrFormData.append('apikey', OCR_SPACE_API_KEY);
@@ -81,7 +76,7 @@ app.post('/ocr', upload.single('file'), async (req, res) => {
 
       const ocrResult = ocrResponse.data;
       if (ocrResult.IsErroredOnProcessing) {
-        throw new Error('OCR.Space processing failed: ' + ocrResult.ErrorMessage.join(', '));
+        throw new Error('OCR failed: ' + ocrResult.ErrorMessage.join(', '));
       }
 
       extractedText = ocrResult.ParsedResults[0]?.ParsedText.trim() || '';
@@ -90,53 +85,53 @@ app.post('/ocr', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file or text provided' });
     }
 
-    // Check if the extracted text is medical
+    // Quick keyword check
     const isTextMedical = medicalKeywords.some(keyword =>
-      extractedText.toLowerCase().includes(keyword.toLowerCase())
+      extractedText.toLowerCase().includes(keyword)
     );
-
     if (!isTextMedical) {
       return res.json({
         extractedText,
-        error: 'Not a medical text. Please provide a medical report.',
+        error: 'Not a medical text. Please provide a valid medical report.',
         diseases: [],
       });
     }
 
-    // Use OpenRouter API to analyze extracted text
+    if (!OPENROUTER_API_KEY) {
+      return res.status(401).json({ error: 'Missing OpenRouter API key' });
+    }
+
+    // Build OpenRouter request
     const openRouterPayload = {
       model: 'deepseek/deepseek-r1:free',
       messages: [
         {
           role: 'user',
-          content: `
-                        You are a medical assistant. Based on the following text extracted from a medical report:
+          content: `You are a medical assistant. Based on the following text from a medical report:
 
-                      "${extractedText}"
+"${extractedText}"
 
-                      Identify potential diseases, suggest appropriate medications, and provide direct links to purchase these medications from reputable online pharmacies (with comparable prices if possible).
+Identify potential diseases, suggest appropriate medications, and provide links to purchase these medicines from reputable online pharmacies.
 
-                      Return your response strictly as a **valid raw JSON object only**. Do NOT include any explanations, comments, or markdown formatting like triple backticks.
+Respond ONLY in this strict JSON format:
 
-                      The response JSON must follow this schema:
-                      {
-                        "extractedText": string, // The text from the medical report
-                        "diseases": [
-                          {
-                            "name": string, // Disease name
-                            "medicines": [string], // Recommended medicines
-                            "purchaseLinks": [string] // URLs to purchase medicines
-                          }
-                        ]
-                      }
+{
+  "extractedText": "string",
+  "diseases": [
+    {
+      "name": "string",
+      "medicines": ["string"],
+      "purchaseLinks": ["string"]
+    }
+  ]
+}
 
-                      If no diseases are identified, return:
-                      {
-                        "extractedText": "...",
-                        "diseases": []
-                      }
-                      `
-          ,
+If no diseases found, return:
+
+{
+  "extractedText": "...",
+  "diseases": []
+}`,
         },
       ],
       response_format: { type: 'json_object' },
@@ -151,63 +146,44 @@ app.post('/ocr', upload.single('file'), async (req, res) => {
       },
     });
 
-    // Validate API response
-    if (openRouterResponse.status !== 200) {
-      throw new Error(`OpenRouter API error: ${openRouterResponse.status} - ${openRouterResponse.statusText}`);
+    const rawContent = openRouterResponse.data?.choices?.[0]?.message?.content;
+    if (!rawContent) {
+      throw new Error('Invalid OpenRouter response structure');
     }
 
-    if (!openRouterResponse.data?.choices?.[0]?.message?.content) {
-      throw new Error('Invalid OpenRouter API response structure');
-    }
+    const cleaned = cleanOpenRouterResponse(rawContent);
+    console.log('Cleaned AI Response:\n', cleaned);
 
-    const medicalDataRaw = openRouterResponse.data.choices[0].message.content;
-    console.log('Full OpenRouter Response:', JSON.stringify(openRouterResponse.data, null, 2));
-    console.log('Raw OpenRouter Response:', medicalDataRaw);
+    const parsed = JSON.parse(cleaned);
 
-    // Clean and parse JSON
-    let parsedMedicalData;
-    try {
-      // Remove control characters and normalize whitespace
-      const cleanedJson = medicalDataRaw.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/\s+/g, ' ');
-      // Remove trailing commas in arrays/objects
-      const fixedJson = cleanedJson.replace(/,(\s*[\]}])/g, '$1');
-      parsedMedicalData = JSON.parse(fixedJson);
-      if (!parsedMedicalData || typeof parsedMedicalData !== 'object') {
-        throw new Error('Parsed OpenRouter response is not a valid object');
-      }
-    } catch (parseError) {
-      console.error('JSON Parse Error:', parseError.message);
-      throw new Error(`Failed to parse OpenRouter response: ${parseError.message}`);
-    }
+    res.json({
+      extractedText: parsed.extractedText || extractedText,
+      diseases: parsed.diseases || [],
+    });
 
-    // Prepare response
-    const responseData = {
-      extractedText: parsedMedicalData.extractedText || extractedText,
-      diseases: parsedMedicalData.diseases || [],
+  } catch (error) {
+    const errorDetails = {
+      message: error.message,
+      stack: error.stack,
+      rawResponse: error.response?.data,
+      rawContent: error.response?.data?.choices?.[0]?.message?.content || null,
     };
 
-    res.json(responseData);
-  } catch (error) {
-    console.error('Error during processing:', {
-      message: error.message,
-      stackTrace: error.stack,
-      rawResponse: error.response?.data,
-    });
-    res.status(500).json({ error: 'Error during processing', details: error.message });
+    console.error('Error during processing:', errorDetails);
+    res.status(500).json({ error: 'Processing failed', details: errorDetails });
   } finally {
-    // Clean up uploaded file if it exists
     if (filePath) {
       try {
         await fsPromises.unlink(filePath);
-        console.log('File cleaned up:', filePath);
-      } catch (err) {
-        console.warn('Error cleaning up file:', err.message);
+        console.log('Temporary file deleted:', filePath);
+      } catch (cleanupError) {
+        console.warn('Cleanup error:', cleanupError.message);
       }
     }
   }
 });
 
-// Start the server
+// Start server
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`🩺 Medico Server is running at http://localhost:${port}`);
 });
