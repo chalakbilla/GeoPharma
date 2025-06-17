@@ -31,7 +31,7 @@ const PrescriptionUpload = () => {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/ocr", formData, {
+      const response = await axios.post("https://geopharma.onrender.com/ocr", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
