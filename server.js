@@ -66,7 +66,7 @@ app.post('/ocr', upload.single('file'), async (req, res) => {
     if (req.body.text) {
       extractedText = req.body.text.trim();
       console.log('Received Text:', extractedText);
-    } 
+    }
     // Handle file upload
     else if (req.file) {
       const ocrFormData = new FormData();
@@ -110,13 +110,33 @@ app.post('/ocr', upload.single('file'), async (req, res) => {
         {
           role: 'user',
           content: `
-            You are a medical assistant. Based on the following text extracted from a medical report: "${extractedText}",
-            identify potential diseases, suggest appropriate medications, and provide links to purchase these medications from reputable online pharmacies with comparable prices.
-            Return the response in JSON format with fields:
-            - extractedText: string (the text from the report)
-            - diseases: array of objects with name (string), medicines (array of strings), and purchaseLinks (array of strings)
-            If no diseases are identified, return an empty diseases array.
-          `,
+                        You are a medical assistant. Based on the following text extracted from a medical report:
+
+                      "${extractedText}"
+
+                      Identify potential diseases, suggest appropriate medications, and provide direct links to purchase these medications from reputable online pharmacies (with comparable prices if possible).
+
+                      Return your response strictly as a **valid raw JSON object only**. Do NOT include any explanations, comments, or markdown formatting like triple backticks.
+
+                      The response JSON must follow this schema:
+                      {
+                        "extractedText": string, // The text from the medical report
+                        "diseases": [
+                          {
+                            "name": string, // Disease name
+                            "medicines": [string], // Recommended medicines
+                            "purchaseLinks": [string] // URLs to purchase medicines
+                          }
+                        ]
+                      }
+
+                      If no diseases are identified, return:
+                      {
+                        "extractedText": "...",
+                        "diseases": []
+                      }
+                      `
+          ,
         },
       ],
       response_format: { type: 'json_object' },
