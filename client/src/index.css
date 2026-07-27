@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-bg: #f2ead9;
+  --color-surface: #fbf6ea;
+  --color-ink: #2c2a23;
+  --color-ink-soft: #6b6455;
+  --color-line: #ddd0af;
+
+  --color-leaf: #3f7a45;
+  --color-leaf-dark: #2f5c34;
+  --color-clay: #d8802f;
+  --color-clay-dark: #b4691f;
+  --color-brick: #b7503f;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+}
+
+::selection {
+  background-color: var(--color-clay);
+  color: white;
+}
+
+/* prescription-pad edge: a torn/perforated top border used on a few cards */
+.pad-edge {
+  position: relative;
+}
+.pad-edge::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: radial-gradient(circle at 6px 3px, var(--color-bg) 3px, transparent 3px);
+  background-size: 12px 6px;
+  background-repeat: repeat-x;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
