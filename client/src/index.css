@@ -1,20 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Fraunces", serif;
+  --font-display: "Fraunces", Georgia, serif;
   --font-sans: "Inter", system-ui, sans-serif;
 
-  --color-bg: #f2ead9;
-  --color-surface: #fbf6ea;
-  --color-ink: #2c2a23;
-  --color-ink-soft: #6b6455;
-  --color-line: #ddd0af;
-
-  --color-leaf: #3f7a45;
-  --color-leaf-dark: #2f5c34;
-  --color-clay: #d8802f;
-  --color-clay-dark: #b4691f;
-  --color-brick: #b7503f;
+  --color-brand: #0e6b4c;
+  --color-brand-dark: #0a5239;
+  --color-brand-light: #17a572;
+  --color-mint: #e8f5ee;
+  --color-mint-deep: #d3ecdf;
+  --color-page: #f1f8f4;
+  --color-ink: #0f2438;
+  --color-ink-soft: #5b6b7a;
+  --color-line: #dbe8e0;
+  --color-danger: #ef4444;
+  --color-danger-dark: #cf2f31;
+  --color-amber: #f59e0b;
 }
 
 html {
@@ -22,39 +23,139 @@ html {
 }
 
 body {
-  background-color: var(--color-bg);
+  margin: 0;
+  background: linear-gradient(180deg, #f6fbf8 0%, #ebf6f0 100%) fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 {
+h1, h2, h3 {
   font-family: var(--font-display);
 }
 
 ::selection {
-  background-color: var(--color-clay);
+  background: var(--color-brand-light);
   color: white;
 }
 
-/* prescription-pad edge: a torn/perforated top border used on a few cards */
-.pad-edge {
-  position: relative;
+:focus-visible {
+  outline: 2px solid var(--color-brand-light);
+  outline-offset: 2px;
 }
-.pad-edge::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 0;
-  right: 0;
+
+@layer components {
+.card {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-line);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 30px -12px rgba(14, 107, 76, 0.18);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: var(--color-brand);
+  color: white;
+  font-weight: 600;
+  padding: 0.75rem 1.25rem;
+  box-shadow: 0 6px 16px -6px rgba(14, 107, 76, 0.6);
+  transition: background 0.15s, transform 0.15s;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-brand-dark);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  background: white;
+  color: var(--color-ink);
+  font-weight: 600;
+  padding: 0.75rem 1.25rem;
+  border: 1px solid var(--color-line);
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--color-brand-light);
+  background: var(--color-mint);
+}
+.btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  background: white;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus {
+  border-color: var(--color-brand-light);
+  box-shadow: 0 0 0 3px rgba(23, 165, 114, 0.18);
+}
+}
+
+/* chat typing indicator */
+.typing-dot {
+  width: 6px;
   height: 6px;
-  background-image: radial-gradient(circle at 6px 3px, var(--color-bg) 3px, transparent 3px);
-  background-size: 12px 6px;
-  background-repeat: repeat-x;
+  border-radius: 9999px;
+  background: var(--color-ink-soft);
+  animation: typing 1.2s infinite ease-in-out;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--r, 0deg)); }
+}
+.floaty {
+  animation: floaty 7s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fade-up 0.4s ease both;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+  .card { box-shadow: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  html { scroll-behavior: auto; }
 }

@@ -1,0 +1,29 @@
+{
+  "name": "geopharma",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GeoPharma — AI prescription reader. Frontend (client/) and API (server/ + api/) in one repo, deployed on Vercel.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "concurrently -n api,web -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "node --watch server/src/local.js",
+    "dev:client": "npm --prefix client run dev",
+    "install:all": "npm install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "db:init": "node server/src/db/init.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.14.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

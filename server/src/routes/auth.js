@@ -1,30 +1,32 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import { query } from "../db/index.js";
+import { requireAuth, signToken } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 const router = Router();
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function signToken(user) {
-  return jwt.sign(
-    { id: user.id, email: user.email, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
-}
+const normEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+const normName = (v) => (typeof v === "string" ? v.trim().slice(0, 80) : "");
 
-router.post("/signup", async (req, res) => {
-  const { name, email, password } = req.body;
+router.post("/signup", rateLimit({ windowMs: 60_000, max: 10, name: "signup" }), async (req, res) => {
+  const name = normName(req.body?.name);
+  const email = normEmail(req.body?.email);
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
 
   if (!name || !email || !password) {
-    return res.status(400).json({ error: "name, email and password are all required" });
+    return res.status(400).json({ error: "Name, email and password are all required" });
+  }
+  if (!EMAIL_RE.test(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address" });
   }
   if (password.length < 8) {
     return res.status(400).json({ error: "Password needs to be at least 8 characters" });
   }
 
   try {
-    const existing = await query("select id from users where email = $1", [email]);
+    const existing = await query("select id from users where lower(email) = $1", [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: "An account with this email already exists" });
     }
@@ -36,39 +38,41 @@ router.post("/signup", async (req, res) => {
     );
 
     const user = result.rows[0];
-    const token = signToken(user);
-    res.status(201).json({ token, user });
+    res.status(201).json({ token: signToken(user), user });
   } catch (err) {
-    console.error("Signup failed:", err);
+    console.error("Signup failed:", err.message);
     res.status(500).json({ error: "Could not create account, please try again" });
   }
 });
 
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+router.post("/login", rateLimit({ windowMs: 60_000, max: 15, name: "login" }), async (req, res) => {
+  const email = normEmail(req.body?.email);
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
 
   if (!email || !password) {
-    return res.status(400).json({ error: "email and password are required" });
+    return res.status(400).json({ error: "Email and password are required" });
   }
 
   try {
-    const result = await query("select * from users where email = $1", [email]);
+    const result = await query("select * from users where lower(email) = $1", [email]);
     const user = result.rows[0];
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: "Incorrect email or password" });
     }
 
-    const matches = await bcrypt.compare(password, user.password_hash);
-    if (!matches) {
-      return res.status(401).json({ error: "Incorrect email or password" });
-    }
-
-    const token = signToken(user);
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
+    res.json({
+      token: signToken(user),
+      user: { id: user.id, name: user.name, email: user.email },
+    });
   } catch (err) {
-    console.error("Login failed:", err);
+    console.error("Login failed:", err.message);
     res.status(500).json({ error: "Login failed, please try again" });
   }
+});
+
+// Lets the client confirm a stored token is still valid on page load.
+router.get("/me", requireAuth, (req, res) => {
+  res.json({ user: { id: req.user.id, name: req.user.name, email: req.user.email } });
 });
 
 export default router;

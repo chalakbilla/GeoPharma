@@ -1,34 +1,20 @@
 import React from "react";
-import { FaPhoneAlt } from "react-icons/fa";
-import { MdEmail, MdChatBubbleOutline } from "react-icons/md";
+import { FiChevronDown, FiMail, FiMessageCircle, FiPhone } from "react-icons/fi";
+import { useApp } from "../context/AppContext";
 
-const contactMethods = [
+const FAQS = [
   {
-    icon: FaPhoneAlt,
-    title: "Toll-free support",
-    body: (
-      <>
-        Call us anytime: <span className="font-semibold">1800-123-4567</span>
-      </>
-    ),
+    q: "How does the prescription reader work?",
+    a: "Upload a clear photo, scan or PDF of your prescription. Our AI reads the doctor, patient and medicine details and explains each medicine in plain language. You can edit the text it read and re-run the analysis.",
   },
   {
-    icon: MdEmail,
-    title: "Email support",
-    body: (
-      <>
-        Write to us: <span className="font-semibold">support@geopharma.in</span>
-      </>
-    ),
+    q: "Is my prescription stored?",
+    a: "If you're not logged in, nothing is saved. If you're logged in, your analysis is saved to your account under My Rx so you can open it again, and you can delete it any time.",
   },
   {
-    icon: MdChatBubbleOutline,
-    title: "Live chat",
-    body: "Chat with our support team instantly from the icon in the corner of the page.",
+    q: "Which files can I upload?",
+    a: "JPG, PNG, WEBP or PDF up to 4MB. Photos from your phone are compressed automatically before upload.",
   },
-];
-
-const faqs = [
   {
     q: "How do I reset my password?",
     a: "Click 'Forgot password?' on the login page and follow the steps we send to your email.",
@@ -44,44 +30,56 @@ const faqs = [
 ];
 
 const NeedHelp = () => {
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h2 className="text-center font-display text-3xl font-semibold text-[var(--color-ink)]">
-        Need help? We're here.
-      </h2>
-      <p className="mt-2 mb-8 text-center text-[var(--color-ink-soft)]">
-        Choose whichever way works best for you.
-      </p>
+  const { openChat } = useApp();
 
-      <div className="space-y-4">
-        {contactMethods.map(({ icon: Icon, title, body }) => (
-          <div
-            key={title}
-            className="flex items-center gap-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-sm"
-          >
-            <Icon className="text-2xl text-[var(--color-leaf)]" />
-            <div>
-              <h3 className="font-medium text-[var(--color-ink)]">{title}</h3>
-              <p className="text-[var(--color-ink-soft)]">{body}</p>
-            </div>
-          </div>
-        ))}
+  const contacts = [
+    { Icon: FiPhone, title: "Toll-free support", body: "1800-123-4567", href: "tel:18001234567", hint: "Call us anytime" },
+    { Icon: FiMail, title: "Email support", body: "support@geopharma.in", href: "mailto:support@geopharma.in", hint: "We reply within a day" },
+  ];
+
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-8 md:px-6">
+      <div className="text-center">
+        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Need help? We're here.</h1>
+        <p className="mt-3 text-lg text-ink-soft">Choose whichever way works best for you.</p>
       </div>
 
-      <div className="mt-12">
-        <h3 className="mb-4 text-center font-display text-2xl font-semibold text-[var(--color-ink)]">
-          Frequently asked questions
-        </h3>
+      <div className="mt-8 grid gap-4 md:grid-cols-3">
+        {contacts.map(({ Icon, title, body, href, hint }) => (
+          <a key={title} href={href} className="card p-5 transition hover:-translate-y-0.5 hover:shadow-xl">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-mint text-xl text-brand">
+              <Icon />
+            </span>
+            <h2 className="mt-4 font-sans text-lg font-bold">{title}</h2>
+            <p className="font-semibold text-brand">{body}</p>
+            <p className="text-sm text-ink-soft">{hint}</p>
+          </a>
+        ))}
+        <button onClick={() => openChat()} className="card p-5 text-left transition hover:-translate-y-0.5 hover:shadow-xl">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-xl text-white">
+            <FiMessageCircle />
+          </span>
+          <h2 className="mt-4 font-sans text-lg font-bold">Chat with AI assistant</h2>
+          <p className="font-semibold text-brand">Instant answers</p>
+          <p className="text-sm text-ink-soft">Medicines, prescriptions, how-tos</p>
+        </button>
+      </div>
+
+      <section className="mt-12">
+        <h2 className="mb-4 text-center text-3xl font-bold">Frequently asked questions</h2>
         <div className="space-y-3">
-          {faqs.map((item) => (
-            <div key={item.q} className="rounded-xl border border-[var(--color-line)] bg-white p-4">
-              <h4 className="font-medium text-[var(--color-ink)]">{item.q}</h4>
-              <p className="mt-1 text-[var(--color-ink-soft)]">{item.a}</p>
-            </div>
+          {FAQS.map((item) => (
+            <details key={item.q} className="card group px-5 py-4 open:shadow-lg">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <FiChevronDown className="shrink-0 text-brand transition group-open:rotate-180" />
+              </summary>
+              <p className="mt-3 text-ink-soft">{item.a}</p>
+            </details>
           ))}
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

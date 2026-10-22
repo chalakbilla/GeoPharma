@@ -1,165 +1,297 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FiMapPin, FiSearch, FiMenu, FiX } from "react-icons/fi";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { FiBell, FiClock, FiLogOut, FiMapPin, FiMenu, FiSearch, FiUserPlus, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { useApp } from "../context/AppContext";
 import api from "../lib/api";
+
+const navLink = ({ isActive }) =>
+  `text-[15px] font-medium transition hover:text-brand ${isActive ? "text-brand" : "text-ink"}`;
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { location, setLocation } = useApp();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [term, setTerm] = useState("");
+  const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
-  const searchBoxRef = useRef(null);
+  const [locOpen, setLocOpen] = useState(false);
+  const [locDraft, setLocDraft] = useState(location);
+  const searchRef = useRef(null);
+  const locRef = useRef(null);
 
+  // debounced medicine search
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setSearchResults([]);
-      return;
+    const q = term.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return undefined;
     }
+    let cancelled = false;
+    setSearching(true);
     const timer = setTimeout(async () => {
-      setSearching(true);
       try {
-        const { data } = await api.get("/drugs/search", { params: { q: searchTerm } });
-        setSearchResults(data.results || []);
-      } catch (err) {
-        console.error("Drug search failed:", err);
-        setSearchResults([]);
+        const { data } = await api.get("/drugs/search", { params: { q } });
+        if (!cancelled) setResults(data.results || []);
+      } catch {
+        if (!cancelled) setResults([]);
       } finally {
-        setSearching(false);
+        if (!cancelled) setSearching(false);
       }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [term]);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) {
-        setShowResults(false);
-      }
+    const onDown = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowResults(false);
+      if (locRef.current && !locRef.current.contains(e.target)) setLocOpen(false);
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, []);
+
+  const openMedicine = (name) => {
+    setShowResults(false);
+    setTerm("");
+    setMenuOpen(false);
+    navigate(`/medicine/${encodeURIComponent(name)}`);
+  };
+
+  const submitSearch = (e) => {
+    e.preventDefault();
+    const q = term.trim();
+    if (q.length >= 2) openMedicine(q);
+  };
+
+  const saveLocation = (e) => {
+    e.preventDefault();
+    setLocation(locDraft.trim().slice(0, 40));
+    setLocOpen(false);
+  };
 
   const handleLogout = () => {
     logout();
+    setMenuOpen(false);
     navigate("/");
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--color-line)] bg-[var(--color-surface)]/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <Link to="/" className="flex shrink-0 items-center gap-2">
-          <img src="/logo.png" alt="GeoPharma" className="h-9 w-9" />
+    <header className="no-print sticky top-0 z-50 bg-white/95 shadow-[0_1px_0_0_var(--color-line)] backdrop-blur">
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 md:flex-nowrap md:px-6">
+        {/* Brand */}
+        <Link to="/" className="order-1 flex shrink-0 items-center gap-3" onClick={closeMenu}>
+          <img src="/logo.png" alt="GeoPharma" className="h-11 w-11 object-contain" />
           <div className="leading-tight">
-            <p className="font-display text-lg font-semibold text-[var(--color-ink)]">GeoPharma</p>
-            <p className="text-[11px] tracking-wide text-[var(--color-clay-dark)]">
-              India's trusted online pharmacy
-            </p>
+            <p className="font-sans text-xl font-bold tracking-tight text-ink">GeoPharma</p>
+            <p className="text-xs text-ink-soft">India's trusted online pharmacy</p>
           </div>
         </Link>
 
-        <div className="hidden flex-1 items-center gap-2 md:flex">
-          <button className="flex items-center gap-1 rounded-full border border-[var(--color-line)] bg-white px-3 py-1.5 text-sm text-[var(--color-ink-soft)] hover:border-[var(--color-leaf)]">
-            <FiMapPin className="text-[var(--color-leaf)]" /> Location
-          </button>
-          <div className="relative flex-1" ref={searchBoxRef}>
-            <div className="flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-white px-3 py-1.5">
-              <FiSearch className="text-[var(--color-ink-soft)]" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onFocus={() => setShowResults(true)}
-                placeholder="Search medicines, brands..."
-                className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--color-ink-soft)]"
-              />
-            </div>
+        {/* Search */}
+        <div className="relative order-3 w-full md:order-2 md:mx-4 md:w-auto md:flex-1" ref={searchRef}>
+          <form
+            onSubmit={submitSearch}
+            className="flex items-center gap-3 rounded-full border border-line bg-[#f7faf8] px-5 py-3 transition focus-within:border-brand-light focus-within:bg-white"
+          >
+            <FiSearch className="shrink-0 text-lg text-ink-soft" />
+            <input
+              type="text"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              onFocus={() => setShowResults(true)}
+              placeholder="Search medicines, brands..."
+              aria-label="Search medicines"
+              className="w-full bg-transparent text-[15px] outline-none placeholder:text-ink-soft"
+            />
+          </form>
 
-            {showResults && searchTerm.trim() && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border border-[var(--color-line)] bg-white shadow-lg">
-                {searching && (
-                  <p className="px-4 py-3 text-sm text-[var(--color-ink-soft)]">Searching...</p>
-                )}
-                {!searching && searchResults.length === 0 && (
-                  <p className="px-4 py-3 text-sm text-[var(--color-ink-soft)]">No matches found</p>
-                )}
-                {!searching &&
-                  searchResults.map((drug) => (
-                    <div
-                      key={drug.id}
-                      className="flex items-center justify-between gap-3 border-b border-[var(--color-line)] px-4 py-2.5 last:border-b-0 hover:bg-[var(--color-bg)]"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-[var(--color-ink)]">{drug.product_name}</p>
-                        <p className="text-xs text-[var(--color-ink-soft)]">
-                          {drug.manufacturer}
-                          {drug.atc_code ? ` · ${drug.atc_code}` : ""}
-                        </p>
-                      </div>
-                      {drug.dispensing_cat && (
-                        <span className="shrink-0 rounded-full bg-[var(--color-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-ink-soft)]">
-                          Cat {drug.dispensing_cat}
+          {showResults && term.trim().length >= 2 && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-line bg-white p-1.5 shadow-xl">
+              {searching && <p className="px-4 py-3 text-sm text-ink-soft">Searching…</p>}
+              {!searching && results.length === 0 && (
+                <p className="px-4 py-3 text-sm text-ink-soft">No matches found. Try another spelling.</p>
+              )}
+              {!searching &&
+                results.map((drug) => (
+                  <button
+                    key={drug.id}
+                    type="button"
+                    onClick={() => openMedicine(drug.name)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-mint"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink">{drug.name}</span>
+                      {(drug.generic || drug.note) && (
+                        <span className="block truncate text-xs text-ink-soft">
+                          {[drug.generic, drug.note].filter(Boolean).join(" · ")}
                         </span>
                       )}
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-brand">View</span>
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
 
-        <div className="hidden items-center gap-4 md:flex">
-          <Link to="/emergency">
-            <button className="rounded-full bg-[var(--color-brick)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
-              Emergency
+        {/* Desktop actions */}
+        <div className="order-2 ml-auto hidden items-center gap-3 md:order-3 md:ml-0 md:flex">
+          <div className="relative" ref={locRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setLocDraft(location);
+                setLocOpen((v) => !v);
+              }}
+              className="flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2.5 text-[15px] font-semibold text-brand transition hover:border-brand-light hover:bg-mint"
+            >
+              <FiMapPin /> <span className="max-w-[110px] truncate">{location || "Location"}</span>
             </button>
+            {locOpen && (
+              <form
+                onSubmit={saveLocation}
+                className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-line bg-white p-4 shadow-xl"
+              >
+                <p className="text-sm font-semibold text-ink">Where are you?</p>
+                <p className="mb-3 text-xs text-ink-soft">Used to find hospitals and pharmacies near you.</p>
+                <input
+                  autoFocus
+                  value={locDraft}
+                  onChange={(e) => setLocDraft(e.target.value)}
+                  placeholder="City or pincode, e.g. Ranchi"
+                  className="input"
+                  maxLength={40}
+                />
+                <div className="mt-3 flex gap-2">
+                  <button type="submit" className="btn-primary flex-1 py-2 text-sm">
+                    Save
+                  </button>
+                  {location && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocation("");
+                        setLocOpen(false);
+                      }}
+                      className="btn-ghost py-2 text-sm"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+          </div>
+
+          <Link
+            to="/emergency"
+            className="flex items-center gap-2 rounded-xl bg-danger px-5 py-2.5 text-[15px] font-semibold text-white shadow-[0_6px_16px_-6px_rgba(239,68,68,0.7)] transition hover:bg-danger-dark"
+          >
+            <FiBell /> Emergency
           </Link>
-          <nav className="flex items-center gap-4 text-sm text-[var(--color-ink)]">
-            <Link to="/offers" className="hover:text-[var(--color-clay-dark)]">Offers</Link>
-            <Link to="/needhelp" className="hover:text-[var(--color-clay-dark)]">Need Help?</Link>
+
+          <nav className="flex items-center gap-5 pl-2">
+            <NavLink to="/offers" className={navLink}>
+              Offers
+            </NavLink>
+            <NavLink to="/needhelp" className={navLink}>
+              Need Help?
+            </NavLink>
             {user ? (
               <>
-                <span className="text-[var(--color-ink-soft)]">Hi, {user.name?.split(" ")[0]}</span>
-                <button onClick={handleLogout} className="hover:text-[var(--color-brick)]">
-                  Logout
+                <NavLink to="/prescriptions" className={navLink}>
+                  My Rx
+                </NavLink>
+                <span className="text-[15px] text-ink-soft">Hi, {user.name?.split(" ")[0]}</span>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 text-[15px] font-medium text-ink transition hover:text-danger-dark"
+                >
+                  <FiLogOut /> Logout
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="hover:text-[var(--color-clay-dark)]">Login</Link>
-                <Link to="/signup">
-                  <button className="rounded-full bg-[var(--color-leaf)] px-4 py-2 font-medium text-white hover:bg-[var(--color-leaf-dark)]">
-                    Sign up
-                  </button>
+                <NavLink to="/login" className={navLink}>
+                  Login
+                </NavLink>
+                <Link to="/signup" className="btn-primary rounded-xl px-5 py-2.5 text-[15px]">
+                  <FiUserPlus /> Sign up
                 </Link>
               </>
             )}
           </nav>
         </div>
 
-        <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
-          {open ? <FiX size={22} /> : <FiMenu size={22} />}
-        </button>
+        {/* Mobile toggle */}
+        <div className="order-2 ml-auto flex items-center gap-2 md:hidden">
+          <Link
+            to="/emergency"
+            aria-label="Emergency"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger text-white"
+          >
+            <FiBell />
+          </Link>
+          <button
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-line"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Menu"
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
+          </button>
+        </div>
       </div>
 
-      {open && (
-        <div className="flex flex-col gap-3 border-t border-[var(--color-line)] bg-[var(--color-surface)] px-4 py-4 md:hidden">
-          <Link to="/emergency" onClick={() => setOpen(false)} className="font-medium text-[var(--color-brick)]">
-            Emergency
+      {menuOpen && (
+        <div className="flex flex-col gap-1 border-t border-line bg-white px-4 py-3 md:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              const next = window.prompt("Enter your city or pincode", location || "");
+              if (next !== null) setLocation(next.trim().slice(0, 40));
+            }}
+            className="flex items-center gap-2 rounded-xl px-3 py-3 text-left font-medium text-brand hover:bg-mint"
+          >
+            <FiMapPin /> {location || "Set location"}
+          </button>
+          <Link to="/offers" onClick={closeMenu} className="rounded-xl px-3 py-3 font-medium hover:bg-mint">
+            Offers
           </Link>
-          <Link to="/offers" onClick={() => setOpen(false)}>Offers</Link>
-          <Link to="/needhelp" onClick={() => setOpen(false)}>Need Help?</Link>
+          <Link to="/needhelp" onClick={closeMenu} className="rounded-xl px-3 py-3 font-medium hover:bg-mint">
+            Need Help?
+          </Link>
+          <Link to="/assistant" onClick={closeMenu} className="rounded-xl px-3 py-3 font-medium hover:bg-mint">
+            AI Assistant
+          </Link>
           {user ? (
-            <button onClick={handleLogout} className="text-left text-[var(--color-brick)]">Logout</button>
-          ) : (
             <>
-              <Link to="/login" onClick={() => setOpen(false)}>Login</Link>
-              <Link to="/signup" onClick={() => setOpen(false)}>Sign up</Link>
+              <Link to="/prescriptions" onClick={closeMenu} className="flex items-center gap-2 rounded-xl px-3 py-3 font-medium hover:bg-mint">
+                <FiClock /> My prescriptions
+              </Link>
+              <button onClick={handleLogout} className="rounded-xl px-3 py-3 text-left font-medium text-danger-dark hover:bg-red-50">
+                Logout ({user.name?.split(" ")[0]})
+              </button>
             </>
+          ) : (
+            <div className="mt-2 flex gap-2">
+              <Link to="/login" onClick={closeMenu} className="btn-ghost flex-1">
+                Login
+              </Link>
+              <Link to="/signup" onClick={closeMenu} className="btn-primary flex-1">
+                Sign up
+              </Link>
+            </div>
           )}
         </div>
       )}

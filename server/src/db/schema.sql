@@ -13,3 +13,8 @@ create table if not exists prescriptions (
   diseases jsonb,
   created_at timestamptz not null default now()
 );
+
+-- full structured analysis (patient, doctor, medicines, interactions...) used by "My prescriptions"
+alter table prescriptions add column if not exists result jsonb;
+
+create index if not exists prescriptions_user_created_idx on prescriptions (user_id, created_at desc);
