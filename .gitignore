@@ -1,29 +1,25 @@
-# Dependencies
-**/node_modules/
+# dependencies
+node_modules/
+client/node_modules/
 
-# Build output
+# build output
 client/dist/
 .vercel/
 
-# Secrets and environment files
+# secrets — NEVER commit
 .env
 .env.*
 !.env.example
 client/.env
 client/.env.*
-!.env.example
+!client/.env.example
 server/.env
-
-# Service account credentials
 service-account*.json
 *-service-account*.json
-authenticator.json
 *-authenticator.json
-
-# Local runtime files
 want.txt
 *.pem
 
-# Miscellaneous
+# misc
 .DS_Store
 *.log
